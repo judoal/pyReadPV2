@@ -16,10 +16,12 @@ tod="%H%M%S"
 data=[]
 tmp=[]
 invDataDict={}
-listOfInvdata=[]
+listOfInvData=[]
 
 chgContDict={}
 listOfChgContData=[]
+
+totSellCurr=int(0)
 
 def invErrMode(bitPos):
     bitNum= {
@@ -83,12 +85,12 @@ def getErrString(code, type):
  
 def sum_digits(str1):
 #    return sum(int(x) for x in str1 if x.isdigit())
-    a=int(0)
+    a=0
     for x in str1:
-        if x.isdigit():
-            x=int(x)+int(a)
-            a=x
-    return x
+        if str(x).isdigit():
+            a += int(x) 
+#            x=int(x)+int(a)
+    return a
                 
 def decode_inverter_data(inverterList):
         for item in inverterList:
@@ -107,6 +109,9 @@ def decode_inverter_data(inverterList):
                 "Misc" : inverterList[11],
                 "Warn Mode" : inverterList[12]
             }
+            
+        listOfInvData.append(inverterList)
+        
         if invDataDict[inverterList[0]]["Misc"] == str(1):
             invDataDict["ACIn Volt"] *= 2
             invDataDict["ACOut Volt"] *= 2
@@ -132,15 +137,15 @@ def decode_inverter_data(inverterList):
         invDataDict[inverterList[0]]["Warn Mode"]=err
         
         miscCode = invDataDict[inverterList[0]]["Misc"]
-        if warnCode == "000":
+        if miscCode == "000":
             err="OK"
         else:
             err = getErrString(int(warnCode),3)
         invDataDict[inverterList[0]]["Misc"]=err
         
-        print (invDataDict[inverterList[0]])
-
-        return invDataDict
+#        print (invDataDict[inverterList[0]])                
+        
+        return invDataDict[inverterList[0]]
 
         
 def decode_chgcontroller(chgContList):
@@ -150,7 +155,7 @@ def decode_chgcontroller(chgContList):
             "charger Current" : chgContList[2],
             "PV Current" : chgContList[3],
             "PV Voltage" : chgContList[4],
-            "Power (KWH)" : chgContList[5],
+            "Power (KWH)" : float(chgContList[5])/float(10.0),
             "Aux Mode" : chgContList[7],
             "Error" : chgContList[8],
             "Charger Mode" : chgContList[9],
@@ -233,39 +238,52 @@ try:
         timedate=time.strftime(date)
         timetod=time.strftime(tod)
         timestamp=timedate + timetod
-        print (timestamp)
-#        print (datalist)
+        
         for n in range(1,numItems):
+            
             tmp=datalist[n]
-#            print (tmp[0])
-            devlist=tmp[0].split(",")
+            devlist=str(tmp[0]).split(",")
             
             #count number of measurements in each device in CSV delimited string
             #chksum is the last item
-            numStrItem=tmp[0].count(",")
+            numStrItem=str(tmp[0]).count(",")
     
             #chksum is bum of numeric values  of each digit in string
             #alpha is numerically encoded by ascii value - '0'
             
+            
             chksum=devlist[numStrItem]
             csdigit=sum_digits(chksum)
             digits_sum=sum_digits(tmp[0])
-            chksum_calc=int(digits_sum) - int(csdigit)
-            
+
+            chksum_calc=digits_sum - int(csdigit)
             #inverters have numeric code in 0th position
             #numeric code used to calc chksum
             if devlist[0].isdigit():
                 listOfInvdata=[]
                 if (int(chksum_calc) == int(chksum)):
-                    decode_inverter_data(devlist)
-                                       
+                    inv_data=decode_inverter_data(devlist)
+                    print(inv_data)     
+                    totSellCurr += int(inv_data["Sell Current"])
+                                                
             #charge controllers have upper case alpha in 0th position
             #get relative position as index to calc chksum       
             if devlist[0].isalpha():    # devuceID not numeric
                 code = ord(devlist[0]) - ord("0") 
                 if (int(code + chksum_calc) == int (chksum)):
                     decode_chgcontroller(devlist)
+                    
                 
+        print("Sell Current: %3d" % totSellCurr)
+        totPower = totSellCurr * int(123)
+        print("sell WATTS: %4d" % totPower)
+        totSellCurr=int(0)             
+#        print (int(decode_inverter_data(devlist)['1']['Sell Current']) + int(decode_inverter_data(devlist)['2']['Sell Current']))
+#        print(decode_chgcontroller(devlist))
+        
+
+              
+            
 finally:
     print ('closing socket')
     sock.close()
