@@ -154,10 +154,25 @@ def decode_chgcontroller(chgContList):
             "Aux Mode" : chgContList[7],
             "Error" : chgContList[8],
             "Charger Mode" : chgContList[9],
-            "Battery Volt" : chgContList[10]
-            }
-            
+            "Battery Volt" : float(chgContList[10])/10.0
+        }
         listOfChgContData.append(chgContDict)
+        
+        auxModeCode = chgContDict[chgContList[0]]["Aux Mode"]
+        err = chgContAuxMode(auxModeCode)
+        chgContDict[chgContList[0]]["Aux Mode"]=err
+        
+        chgContDict[chgContList[0]]["Error"] = "NA"
+        
+        chgModeCode = chgContDict[chgContList[0]]["Charger Mode"]
+        err= chgContChargeMode(chgModeCode)
+        chgContDict[chgContList[0]]["Charger Mode"] = err
+        
+        
+        
+        
+        
+        
         print (chgContDict[chgContList[0]])
         return chgContDict
                 
@@ -188,6 +203,26 @@ def inverterACMode(ACModeCode):
         }
     return opCode.get(ACModeCode)
 
+def chgContAuxMode(auxModeCode):
+    opCode = {
+        "00" : "Disabled",
+        "01" : "Diversion",
+        "02" : "Remote",
+        "03" : "Manual",
+        "04" : "Vent Fan",
+        "05" : "PV Trigger"
+    }
+    return opCode.get(auxModeCode)
+
+def chgContChargeMode(chgModeCode):
+    opCode = {
+        "00" : "Silent",
+        "01" : "Float",
+        "02" : "Bulk",
+        "03" : "Absorb",
+        "03" : "EQ"
+    }    
+    return opCode.get(chgModeCode)
 #*********************************************************   
              
 try:
