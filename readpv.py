@@ -167,12 +167,7 @@ def decode_chgcontroller(chgContList):
         chgModeCode = chgContDict[chgContList[0]]["Charger Mode"]
         err= chgContChargeMode(chgModeCode)
         chgContDict[chgContList[0]]["Charger Mode"] = err
-        
-        
-        
-        
-        
-        
+
         print (chgContDict[chgContList[0]])
         return chgContDict
                 
