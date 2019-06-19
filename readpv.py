@@ -22,6 +22,8 @@ chgContDict={}
 listOfChgContData=[]
 
 totSellCurr=int(0)
+totBuyCurr=int(0)
+totInvCurr=int(0)
 
 def invErrMode(bitPos):
     bitNum= {
@@ -265,6 +267,8 @@ try:
                     inv_data=decode_inverter_data(devlist)
                     print(inv_data)     
                     totSellCurr += int(inv_data["Sell Current"])
+                    totBuyCurr += int(inv_data['Buy Current'])
+                    totInvCurr += int(inv_data['Inverter Current'])
                                                 
             #charge controllers have upper case alpha in 0th position
             #get relative position as index to calc chksum       
@@ -275,9 +279,16 @@ try:
                     
                 
         print("Sell Current: %3d" % totSellCurr)
+        print("Buy Current: %3d" % totBuyCurr)
+        print("Inverter Current: %3d" % totInvCurr)
         totPower = totSellCurr * int(123)
         print("sell WATTS: %4d" % totPower)
-        totSellCurr=int(0)             
+        load = totInvCurr-totSellCurr+totBuyCurr
+        print ("Load Current: %4d" % load)
+        totSellCurr=int(0)   
+        totBuyCurr=int(0)          
+        totInvCurr=int(0)
+        
 #        print (int(decode_inverter_data(devlist)['1']['Sell Current']) + int(decode_inverter_data(devlist)['2']['Sell Current']))
 #        print(decode_chgcontroller(devlist))
         
