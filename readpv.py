@@ -1,39 +1,7 @@
-#run with python 2.7 due to issues  with b' and split
-#
-
 import socket
 import time
 from _curses import ERR
-
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#server_address = ('127.0.0.1', 5557)
-server_address = ('192.168.1.112', 8899)
-sock.connect(server_address)
-f=open ("readpv.out","w+", buffering=512)
-lineLen=[]
-date="%m%d%Y"
-tod="%H%M%S"
-data=[]
-tmp=[]
-invDataDict={}
-listOfInvData=[]
-
-chgContDict={}
-listOfChgContData=[]
-inverterList = []
-
-totSellCurr=int(0)
-totBuyCurr=int(0)
-totInvCurr=int(0)
-
-ACOutVolt = int(0)
-ACInVolt = int(0)
-invBattVolt = int(0)
-chgContBattVolt = int(0)
-numInverters = float(0.0)
-numChgCont = float(0.0)
-PVKWH = float(0)
-pvWatts = int(0)
+from dynplot import dynplot
 
 def invErrMode(bitPos):
     bitNum= {
@@ -103,7 +71,7 @@ def sum_digits(str1):
             a += int(x) 
     return a
                 
-def decode_inverter_data(inverterList):
+def decode_inverter_data(inverterList,invDataDict, listOfInvData):
         for item in inverterList:
             invDataDict[inverterList[0]] = {  
                 "ID" : inverterList[0],
@@ -156,7 +124,7 @@ def decode_inverter_data(inverterList):
         return invDataDict[inverterList[0]]
 
         
-def decode_chgcontroller(chgContList):
+def decode_chgcontroller(chgContList, chgContDict, listOfChgContData):
     for item in chgContList:
         chgContDict[chgContList[0]] = {
             "ID" : chgContList[0], 
@@ -231,112 +199,166 @@ def chgContChargeMode(chgModeCode):
     }    
     return opCode.get(chgModeCode)
 #*********************************************************   
-             
-try:
+def runReader(): 
     
-    while 1:
-        data = sock.recv(512)
-        data = data.decode('ISO-8859-1')
-#        print (data)
-        lines=data.splitlines()
-#        print(lines)
-        numItems=len(lines)
-#        print (numItems)
-#        for items in lines:  
-        datalist=([[x] for x in lines])
-        timedate=time.strftime(date)
-        timetod=time.strftime(tod)
-        timestamp=timedate + timetod
-        ACOutVolt = 0
-        ACInVolt = 0
-        InvBattVolt = 0
-        for n in range(1,numItems):           
-            tmp=datalist[n]
-            devlist=str(tmp[0]).split(",")
-            
-            #count number of measurements in each device in CSV delimited string
-            #chksum is the last item
-            numStrItem=str(tmp[0]).count(",")
     
-            #chksum is bum of numeric values  of each digit in string
-            #alpha is numerically encoded by ascii value - '0'
-            
-            
-            chksum=devlist[numStrItem]
-            csdigit=sum_digits(chksum)
-            digits_sum=sum_digits(tmp[0])
+     
+    iSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #server_address = ('127.0.0.1', 5557)
+    server_address = ('192.168.1.112', 8899)
+    iSock.connect(server_address)
+#    f=open ("readpv.out","w+", buffering=512)
+    
+    lineLen=[]
+    date="%m%d%Y"
+    tod="%H%M%S"
+    data=[]
+    tmp=[]
+    invDataDict={}
+    listOfInvData=[]
+    
+    chgContDict={}
+    listOfChgContData=[]
+    inverterList = []
+    
+    
+    totSellCurr=int(0)
+    totBuyCurr=int(0)
+    totInvCurr=int(0)
+    
+    ACOutVolt = int(0)
+    ACInVolt = int(0)
+    invBattVolt = int(0)
+    chgContBattVolt = int(0)
+    numInverters = float(0.0)
+    numChgCont = float(0.0)
+    PVKWH = float(0)
+    pvWatts = int(0)
+    ctr=0 
+    i=-1
+    y=[0]*20
+    try:
+        dplt=dynplot()
+        while 1:
+            data = iSock.recv(512)
+            data = data.decode('ISO-8859-1')
+    #        print (data)
+            lines=data.splitlines()
+    #        print(lines)
+            numItems=len(lines)
+    #        print (numItems)
+    #        for items in lines:  
+            datalist=([[x] for x in lines])
+            timedate=time.strftime(date)
+            timetod=time.strftime(tod)
+            timestamp=timedate + timetod
+            ACOutVolt = 0
+            ACInVolt = 0
+            InvBattVolt = 0
+            for n in range(1,numItems):           
+                tmp=datalist[n]
+                devlist=str(tmp[0]).split(",")
+                
+                #count number of measurements in each device in CSV delimited string
+                #chksum is the last item
+                numStrItem=str(tmp[0]).count(",")
+        
+                #chksum is bum of numeric values  of each digit in string
+                #alpha is numerically encoded by ascii value - '0'               
+                chksum=devlist[numStrItem]
+                csdigit=sum_digits(chksum)
+                digits_sum=sum_digits(tmp[0])  
+                chksum_calc=digits_sum - int(csdigit)
+                #inverters have numeric code in 0th position
+                #numeric code used to calc chksum
+                
+                if devlist[0].isdigit():
+                    numInverters += int(1)
+    #                listOfInvData=[]
+                    if (int(chksum_calc) == int(chksum)):
+                        inv_data=decode_inverter_data(devlist,invDataDict,listOfInvData)
+    #                    print(inv_data)     
+                        totSellCurr += int(inv_data["Sell Current"])
+                        totBuyCurr += int(inv_data['Buy Current'])
+                        totInvCurr += int(inv_data['Inverter Current'])
+                        ACOutVolt += int(inv_data['ACOut Volt'])
+                        ACInVolt += int(inv_data['ACIn Volt'])
+                        invBattVolt += float(inv_data['Battery Volt'])
+                        
+                             
+                #charge controllers have upper case alpha in 0th position
+                #get relative position as index to calc chksum       
+                if devlist[0].isalpha():    # deviceID not numeric
+                    numChgCont += int(1)
+                    code = ord(devlist[0]) - ord("0") 
+                    if (int(code + chksum_calc) == int (chksum)):
+                        chgCont_data = decode_chgcontroller(devlist,chgContDict, listOfChgContData)
+     #                   print (chgCont_data)
+                        chgContBattVolt += float(chgCont_data['Battery Volt'])
+                        PVKWH += float(chgCont_data['Power (KWH)'])
+                        pvWatts += (int(chgCont_data['PV Voltage']) * int(chgCont_data['PV Current']))
+                                    
+    #        print ("Timestamp (mmddyyyyhhmmss): %s" % timestamp)        
+    #        print("Sell Current: %3d" % totSellCurr)
+    #        print("Buy Current: %3d" % totBuyCurr)
+    #        print("Inverter Current: %3d" % totInvCurr)
+    #        totPower = totSellCurr * int(123)
+    #        print("sell WATTS: %4d" % totPower)
+    #       load = totInvCurr-totSellCurr+totBuyCurr
+    #        print ("Load Current: %4d" % load)
+            if numInverters > 0:
+                ACOutVolt /= numInverters
+                ACInVolt /= numInverters
+                invBattVolt /= numInverters
+                chgContBattVolt /= numChgCont
+    #        print ("ACOut Volt (avg): %3d" % int(ACOutVolt))
+    #        print ("ACIn Volt (avg): %3d" % int(ACInVolt))
+    #        print ("Invert Battery Volt (avg): %.1f" % float(invBattVolt))
+    #        print ("Charge Controller Battery Volt (avg): %.1f" % float(chgContBattVolt))
+    #        print ("PV Power (KWH): %.1f" % float(PVKWH))
+    #        print ("PV Watts : %4d" % int(pvWatts))
 
-            chksum_calc=digits_sum - int(csdigit)
-            #inverters have numeric code in 0th position
-            #numeric code used to calc chksum
+            print(pvWatts)
             
-            if devlist[0].isdigit():
-                numInverters += int(1)
-#                listOfInvData=[]
-                if (int(chksum_calc) == int(chksum)):
-                    inv_data=decode_inverter_data(devlist)
-                    print(inv_data)     
-                    totSellCurr += int(inv_data["Sell Current"])
-                    totBuyCurr += int(inv_data['Buy Current'])
-                    totInvCurr += int(inv_data['Inverter Current'])
-                    ACOutVolt += int(inv_data['ACOut Volt'])
-                    ACInVolt += int(inv_data['ACIn Volt'])
-                    invBattVolt += float(inv_data['Battery Volt'])
-                    
-                         
-            #charge controllers have upper case alpha in 0th position
-            #get relative position as index to calc chksum       
-            if devlist[0].isalpha():    # deviceID not numeric
-                numChgCont += int(1)
-                code = ord(devlist[0]) - ord("0") 
-                if (int(code + chksum_calc) == int (chksum)):
-                    chgCont_data = decode_chgcontroller(devlist)
-                    print (chgCont_data)
-                    chgContBattVolt += float(chgCont_data['Battery Volt'])
-                    PVKWH += float(chgCont_data['Power (KWH)'])
-                    pvWatts += (int(chgCont_data['PV Voltage']) * int(chgCont_data['PV Current']))
-                                
-        print ("Timestamp (mmddyyyyhhmmss): %s" % timestamp)        
-        print("Sell Current: %3d" % totSellCurr)
-        print("Buy Current: %3d" % totBuyCurr)
-        print("Inverter Current: %3d" % totInvCurr)
-        totPower = totSellCurr * int(123)
-        print("sell WATTS: %4d" % totPower)
-        load = totInvCurr-totSellCurr+totBuyCurr
-        print ("Load Current: %4d" % load)
-        if numInverters > 0:
-            ACOutVolt /= numInverters
-            ACInVolt /= numInverters
-            invBattVolt /= numInverters
-            chgContBattVolt /= numChgCont
-        print ("ACOut Volt (avg): %3d" % int(ACOutVolt))
-        print ("ACIn Volt (avg): %3d" % int(ACInVolt))
-        print ("Invert Battery Volt (avg): %.1f" % float(invBattVolt))
-        print ("Charge Controller Battery Volt (avg): %.1f" % float(chgContBattVolt))
-        print ("PV Power (KWH): %.1f" % float(PVKWH))
-        print ("PV Watts : %4d" % int(pvWatts))
-#        dictionary access
-#        print (listOfInvData)
-#        print (listOfInvData[n]['Op Mode'])   n=0-2  (numInverters)
-#        print (listOfChgContData)
-        
-        listOfInvData=[]
-        listOfChgContData = []
-        totSellCurr=int(0)   
-        totBuyCurr=int(0)          
-        totInvCurr=int(0)
-        ACOutVolt=int(0)
-        ACInVolt=int(0)
-        numInverters = int(0)
-        numChgCont = 0
-        invBattVolt = float(0.0)
-        chgContBattVolt = float(0.0)
-        PVKWH=float(0)
-        pvWatts=int(0)
-        
-#        print (int(decode_inverter_data(devlist)['1']['Sell Current']) + int(decode_inverter_data(devlist)['2']['Sell Current']))
-#        print(decode_chgcontroller(devlist))
             
-finally:
-    print ('closing socket')
-    sock.close()
+    #        dictionary access
+    #        print (listOfInvData)
+    #        print (listOfInvData[n]['Op Mode'])   n=0-2  (numInverters)
+    #        print (listOfChgContData)
+            
+            listOfInvData=[]
+            listOfChgContData = []
+            totSellCurr=int(0)   
+            totBuyCurr=int(0)          
+            totInvCurr=int(0)
+            ACOutVolt=int(0)
+            ACInVolt=int(0)
+            numInverters = int(0)
+            numChgCont = 0
+            invBattVolt = float(0.0)
+            chgContBattVolt = float(0.0)
+            PVKWH=float(0)
+            pvWatts=int(0)
+            
+    #        print (int(decode_inverter_data(devlist)['1']['Sell Current']) + int(decode_inverter_data(devlist)['2']['Sell Current']))
+    #        print(decode_chgcontroller(devlist))
+                
+    finally:
+        print ('closing socket')
+        iSock.close()
+        
+def putItem(item):
+    return item  
+
+def getItem():
+    return item
+   
+if __name__ == '__main__':
+#    def startReader():
+    
+    
+    print ("starting reader")
+    
+    
+    runReader()
+    
